@@ -96,7 +96,8 @@ def _genrule(src_dir, genrule_name, command, outs, local):
         "genrule(\n" +
         '    name = "' +
         genrule_name + '",\n' + (
-        "    local = 1,\n" if local else "") +
+            "    local = 1,\n" if local else ""
+        ) +
         "    outs = [\n" +
         outs +
         "\n    ],\n" +
@@ -328,6 +329,21 @@ def _get_embed_flags(repository_ctx, python_config):
 
     return compiler_flags, linker_flags
 
+def _get_numpy_include(repository_ctx, python_bin):
+    """Gets the numpy include path."""
+    return execute(
+        repository_ctx,
+        [
+            python_bin,
+            "-c",
+            "from __future__ import print_function;" +
+            "import numpy;" +
+            " print(numpy.get_include());",
+        ],
+        error_msg = "Problem getting numpy include path.",
+        error_details = "Is numpy installed?",
+    ).stdout.splitlines()[0]
+
 def _create_local_python_repository(repository_ctx):
     """Creates the repository containing files set up to build with Python."""
     python_bin = _get_python_bin(repository_ctx)
@@ -335,11 +351,18 @@ def _create_local_python_repository(repository_ctx):
     python_lib = _get_python_lib(repository_ctx, python_bin)
     _check_python_lib(repository_ctx, python_lib)
     python_include = _get_python_include(repository_ctx, python_bin)
+    numpy_include = _get_numpy_include(repository_ctx, python_bin) + "/numpy"
     python_include_rule = _symlink_genrule_for_dir(
         repository_ctx,
         python_include,
         "python_include",
         "python_include",
+    )
+    numpy_include_rule = _symlink_genrule_for_dir(
+        repository_ctx,
+        numpy_include,
+        "numpy_include/numpy",
+        "numpy_include",
     )
 
     # To embed python in C++, we need the linker and compiler flags required to embed the Python interpreter
@@ -369,6 +392,7 @@ def _create_local_python_repository(repository_ctx):
     _tpl(repository_ctx, "BUILD", {
         "%{PYTHON_BIN_PATH}": python_bin,
         "%{PYTHON_INCLUDE_GENRULE}": python_include_rule,
+        "%{NUMPY_INCLUDE_GENRULE}": numpy_include_rule,
         "%{PYTHON_IMPORT_LIB_GENRULE}": python_import_lib_genrule,
         "%{PYTHON_EMBED_COPTS}": python_embed_copts,
         "%{PYTHON_EMBED_LINKOPTS}": python_embed_linkopts,
@@ -395,7 +419,7 @@ python_configure = repository_rule(
         _PYTHON_LIB_PATH,
     ],
     attrs = {
-        "python_version": attr.string(default=""),
+        "python_version": attr.string(default = ""),
         "python_interpreter_target": attr.label(),
     },
 )
