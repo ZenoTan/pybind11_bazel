@@ -331,7 +331,7 @@ def _get_embed_flags(repository_ctx, python_config):
 
 def _get_numpy_include(repository_ctx, python_bin):
     """Gets the numpy include path."""
-    return execute(
+    return _execute(
         repository_ctx,
         [
             python_bin,
